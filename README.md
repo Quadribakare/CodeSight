@@ -123,7 +123,7 @@ flowchart TD
 ## Repository structure
 
 ```
-data/                        # drawing PDFs (gitignored — not committed)
+data/                        # drawing PDFs — two anonymized sample drawings included; anything else you add stays untracked
 knowledge_base/
   regulations_combined.txt   # extracted regulation text (3 source documents)
 knowledge_base_schema/
@@ -168,7 +168,9 @@ pip install -r requirements.txt
 copy .env.example .env          # then fill in OPENROUTER_API_KEY
 ```
 
-Put one or more drawing PDFs in `data/` before running anything.
+Two sample drawings are included in `data/` so you can run the pipeline immediately — the
+Electrical Plans sheet produces the socket-outlet-height FAIL demo. Add your own drawing PDFs
+to `data/` to test others (they stay untracked by git).
 
 ### Model
 
