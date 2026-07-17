@@ -4,7 +4,7 @@ An AI pipeline that reads CAD-exported architectural drawing PDFs and checks the
 UK (Northern Ireland) building regulations — producing **pass / fail / flag verdicts with the
 exact regulation clause cited as evidence** for every finding.
 
-Built as an MSc dissertation project. Prototype status: working end-to-end on real drawing sets.
+A personal R&D project. Prototype status: working end-to-end on real drawing sets.
 
 ---
 
@@ -245,7 +245,7 @@ python -m src.agents.matcher
 
 ## Project context
 
-MSc dissertation project on automated building-regulation compliance checking for architectural
+A personal project exploring automated building-regulation compliance checking for architectural
 drawings. The pipeline design (staged, evidence-cited, honest-uncertainty) is aimed at the workflow
 of building control bodies and warranty providers, where every automated finding must be
 independently verifiable by a human reviewer.
