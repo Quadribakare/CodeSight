@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('index') }}" class="back-link">&larr; All drawings</a>
+<h1>{{ filename }}</h1>
+
+<section class="stage-card">
+  <div class="stage-header">
+    <h2>Stage A — Classification</h2>
+    <form action="{{ url_for('run_stage_a', filename=filename) }}" method="post">
+      <button type="submit" class="btn btn-primary">Run Stage A</button>
+    </form>
+  </div>
+
+  {% if classification %}
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>Page</th><th>Class</th><th>Subtype</th><th>Confidence</th>
+          <th>Needs review</th><th>Filename mismatch</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in classification %}
+        <tr>
+          <td>{{ c.page_number }}</td>
+          <td>{{ c.page_class }}</td>
+          <td>{{ c.subtype }}</td>
+          <td>{{ "%.2f"|format(c.confidence) }}</td>
+          <td>{% if c.needs_review %}<span class="badge badge-flag">yes</span>{% else %}—{% endif %}</td>
+          <td>{% if c.filename_mismatch %}<span class="badge badge-flag">yes</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">Not run yet.</p>
+  {% endif %}
+</section>
+
+<section class="stage-card">
+  <div class="stage-header">
+    <h2>Stage B — Fact Extraction</h2>
+    <form action="{{ url_for('run_stage_b', filename=filename) }}" method="post">
+      <button type="submit" class="btn btn-primary" {{ "disabled" if not classification }}>Run Stage B</button>
+    </form>
+  </div>
+
+  {% if features %}
+    <p class="stage-summary">{{ features|length }} fact(s) extracted.</p>
+    <div class="scroll-table">
+      <table class="result-table">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Unit</th><th>Type</th><th>Source quote</th></tr>
+        </thead>
+        <tbody>
+          {% for f in features %}
+          <tr>
+            <td>{{ f.parameter_name }}</td>
+            <td>{{ f.value }}</td>
+            <td>{{ f.unit or "—" }}</td>
+            <td>{{ f.fact_type }}</td>
+            <td class="quote-cell">{{ f.source_quote }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">Not run yet.</p>
+  {% endif %}
+</section>
+
+<section class="stage-card">
+  <div class="stage-header">
+    <h2>Stage C — Matching &amp; Judgement</h2>
+    <form action="{{ url_for('run_stage_c', filename=filename) }}" method="post" class="stage-c-form">
+      <input type="number" name="limit" placeholder="limit (optional)" min="1">
+      <button type="submit" class="btn btn-primary" {{ "disabled" if not features }}>Run Stage C</button>
+    </form>
+  </div>
+
+  {% if verdicts %}
+    <div class="verdict-summary">
+      <button type="button" class="badge badge-all badge-filter badge-active" data-filter="all">all: {{ verdicts|length }}</button>
+      <button type="button" class="badge badge-pass badge-filter" data-filter="pass">pass: {{ verdict_counts.get("pass", 0) }}</button>
+      <button type="button" class="badge badge-fail badge-filter" data-filter="fail">fail: {{ verdict_counts.get("fail", 0) }}</button>
+      <button type="button" class="badge badge-flag badge-filter" data-filter="flag">flag: {{ verdict_counts.get("flag", 0) }}</button>
+      <button type="button" class="badge badge-no-matching-clause badge-filter" data-filter="no_matching_clause">no match: {{ verdict_counts.get("no_matching_clause", 0) }}</button>
+    </div>
+    <div class="scroll-table">
+      <table class="result-table">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Verdict</th><th>Reasoning</th><th>Cited document</th></tr>
+        </thead>
+        <tbody id="verdict-table-body">
+          {% for v in verdicts %}
+          <tr data-verdict="{{ v.verdict }}">
+            <td>{{ v.parameter_name }}</td>
+            <td>{{ v.value }}{{ v.unit or "" }}</td>
+            <td><span class="badge badge-{{ v.verdict.replace('_', '-') }}">{{ v.verdict }}</span></td>
+            <td class="quote-cell">{{ v.reasoning }}</td>
+            <td>{{ v.cited_source_document or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">Not run yet.</p>
+  {% endif %}
+</section>
+
+{% if verdicts %}
+<script src="{{ url_for('static', filename='verdict-filter.js') }}"></script>
+{% endif %}
+{% endblock %}

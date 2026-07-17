@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/schemas/clause_schema.json",
+  "title": "Building Regulation Clause Record",
+  "description": "One machine-readable regulation clause stored in knowledge_base/ as a JSON record. Populated from source regulation documents (e.g. Technical Booklets) and consumed by matcher.py and judge.py.",
+  "type": "object",
+  "required": [
+    "clause_id",
+    "source_document",
+    "section_reference",
+    "title",
+    "requirement_text",
+    "applies_to"
+  ],
+  "properties": {
+    "clause_id": {
+      "type": "string",
+      "description": "Stable unique identifier for this clause, e.g. 'TB-PART-F1-3.2'."
+    },
+    "source_document": {
+      "type": "string",
+      "description": "Title of the regulation document this clause was extracted from, e.g. 'Technical Booklet F1 (2022)'."
+    },
+    "section_reference": {
+      "type": "string",
+      "description": "Section/paragraph number within the source document, e.g. '3.2.1'."
+    },
+    "title": {
+      "type": "string",
+      "description": "Short human-readable title of the clause."
+    },
+    "requirement_text": {
+      "type": "string",
+      "description": "Verbatim or lightly normalised text of the regulatory requirement."
+    },
+    "applies_to": {
+      "type": "object",
+      "description": "Which drawing classes/subtypes this clause is relevant to, matching classifier_agent's taxonomy.",
+      "required": ["class"],
+      "properties": {
+        "class": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Architectural", "Engineering", "Finishes", "Safety"]
+          }
+        },
+        "subtype": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "checkable_parameters": {
+      "type": "array",
+      "description": "Structured numeric/categorical thresholds this clause imposes, for automated checking against facts extracted by feature_agent.",
+      "items": {
+        "type": "object",
+        "required": ["parameter_name", "operator", "value", "unit"],
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "description": "Name of the fact this threshold applies to, e.g. 'door_clear_width', 'stair_riser_height'."
+          },
+          "operator": {
+            "type": "string",
+            "enum": ["<", "<=", ">", ">=", "==", "!="]
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit of measurement, e.g. 'mm', 'm2', 'degrees'."
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional free-text notes, exceptions, or cross-references to other clauses."
+    }
+  }
+}

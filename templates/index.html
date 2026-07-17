@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Drawings{% endblock %}
+{% block content %}
+<h1>Drawings</h1>
+
+<form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" class="upload-form">
+  <input type="file" name="pdf_file" accept="application/pdf" required>
+  <button type="submit" class="btn btn-primary">Upload PDF</button>
+</form>
+
+<div class="pdf-list">
+  {% for pdf in pdfs %}
+  <a class="pdf-card" href="{{ url_for('dashboard', filename=pdf.filename) }}">
+    <div class="pdf-name">{{ pdf.filename }}</div>
+    <div class="stage-dots">
+      <span class="dot {{ 'dot-on' if pdf.has_a else '' }}" title="Stage A: Classification">A</span>
+      <span class="dot {{ 'dot-on' if pdf.has_b else '' }}" title="Stage B: Fact Extraction">B</span>
+      <span class="dot {{ 'dot-on' if pdf.has_c else '' }}" title="Stage C: Matching &amp; Judgement">C</span>
+    </div>
+  </a>
+  {% else %}
+  <p class="empty">No PDFs yet — upload one above, or drop a file into the data/ folder.</p>
+  {% endfor %}
+</div>
+{% endblock %}
