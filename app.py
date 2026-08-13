@@ -41,15 +41,19 @@ def _pdf_status(filename: str) -> dict:
 def debug_blobs():
     # Temporary: dump raw stored pathnames to debug a filename-encoding
     # mismatch. Remove before calling this done.
-    prefix = request.args.get("prefix", "")
     filename = request.args.get("filename", "")
-    result = {
-        "prefix_sent": prefix,
-        "matches": [b["pathname"] for b in storage._blob_list(prefix)],
-    }
+    result = {}
     if filename:
+        pathname = storage.DATA_PREFIX + filename
+        local_path = storage.LOCAL_DATA_DIR / filename
+        candidates = storage._blob_list(pathname)
         result["filename_repr"] = repr(filename)
-        result["ensure_local_pdf_result"] = str(storage.ensure_local_pdf(filename))
+        result["pathname_built_repr"] = repr(pathname)
+        result["local_path_existed_before_lookup"] = local_path.exists()
+        result["candidates_found"] = [
+            {"pathname_repr": repr(b["pathname"]), "equal_to_built": b["pathname"] == pathname}
+            for b in candidates
+        ]
     return result
 
 
