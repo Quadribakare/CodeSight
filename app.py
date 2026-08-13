@@ -50,6 +50,19 @@ def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
 
 
+@app.route("/debug/raw")
+def debug_raw():
+    # Temporary: serve the raw uploaded PDF bytes for local comparison
+    # testing. Remove after.
+    from flask import send_file
+
+    filename = request.args.get("filename", "")
+    pdf_path = storage.ensure_local_pdf(filename)
+    if pdf_path is None:
+        return "not found", 404
+    return send_file(pdf_path, mimetype="application/pdf")
+
+
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]
