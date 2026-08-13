@@ -50,31 +50,6 @@ def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
 
 
-@app.route("/debug/download")
-def debug_download():
-    # Temporary: full diagnostic for the delete-then-reupload 404. Remove after.
-    import requests
-
-    filename = request.args.get("filename", "")
-    pathname = storage.DATA_PREFIX + filename
-    matches = [b for b in storage._blob_list(pathname) if b["pathname"] == pathname]
-    result = {"pathname": pathname, "matches": matches}
-    if matches:
-        url = matches[0]["url"]
-        attempts = []
-        for delay in (0, 0.5, 1, 2, 3, 5, 8):
-            import time as _time
-
-            if delay:
-                _time.sleep(delay)
-            resp = requests.get(f"{url}?download=1", timeout=30)
-            attempts.append({"delay_before": delay, "status": resp.status_code, "len": len(resp.content)})
-            if resp.status_code != 404:
-                break
-        result["attempts"] = attempts
-    return result
-
-
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]

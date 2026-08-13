@@ -84,7 +84,7 @@ def _quote(name: str) -> str:
     return quote(name, safe="")
 
 
-_DOWNLOAD_RETRY_DELAYS_SEC = (0, 0.5, 1, 2, 3)  # ~6.5s total budget
+_DOWNLOAD_RETRY_DELAYS_SEC = (0, 0.5, 1, 2, 3, 5, 8)  # ~19.5s total budget
 
 
 def _download_blob(url: str, dest_path: Path) -> None:
@@ -150,7 +150,15 @@ def save_uploaded_pdf(filename: str, file_storage) -> None:
         BUNDLED_DATA_DIR.mkdir(parents=True, exist_ok=True)
         file_storage.save(BUNDLED_DATA_DIR / filename)
         return
-    vercel_blob.put(DATA_PREFIX + _quote(filename), file_storage.read(), {"allowOverwrite": "true"})
+    data = file_storage.read()
+    vercel_blob.put(DATA_PREFIX + _quote(filename), data, {"allowOverwrite": "true"})
+    # Also cache locally right away, so the redirect that immediately follows
+    # an upload can serve this same file straight from /tmp instead of
+    # round-tripping through Blob's CDN -- which can briefly 404 right after
+    # a delete followed by a re-upload to the same pathname -- if that
+    # request happens to land on this same warm container.
+    LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (LOCAL_DATA_DIR / filename).write_bytes(data)
 
 
 def delete_pdf(filename: str) -> None:
