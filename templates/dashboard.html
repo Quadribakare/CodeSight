@@ -2,7 +2,15 @@
 {% block title %}{{ filename }}{% endblock %}
 {% block content %}
 <a href="{{ url_for('index') }}" class="back-link">&larr; All drawings</a>
-<h1>{{ filename }}</h1>
+<div class="dashboard-header">
+  <h1>{{ filename }}</h1>
+  {% if classification or features or verdicts %}
+  <form action="{{ url_for('clear_results', filename=filename) }}" method="post"
+        onsubmit="return confirm('Clear all Stage A/B/C results for this PDF? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger">Clear results</button>
+  </form>
+  {% endif %}
+</div>
 
 <section class="stage-card">
   <div class="stage-header">

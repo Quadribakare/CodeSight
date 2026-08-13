@@ -24,6 +24,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,10 @@ from typing import Any
 from src.openrouter_client import OpenRouterClient
 
 DEFAULT_MODEL = "google/gemini-3.1-flash-lite-20260507"
+
+# Each notes block is an independent, text-only API call -- network-bound,
+# so a few can run at once instead of paying every call's latency serially.
+DEFAULT_MAX_WORKERS = 8
 
 VALID_FACT_TYPES = {"tagged_dimension", "note_derived"}
 
@@ -475,6 +480,7 @@ def extract_page_features_thorough(
     client: OpenRouterClient,
     model: str = DEFAULT_MODEL,
     verbose: bool = False,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> list[ExtractedFact]:
     """Run both extraction passes for one page and converge them into one fact list.
 
@@ -484,6 +490,9 @@ def extract_page_features_thorough(
     every value in just that section -- addressing dense paragraphs the
     single whole-page pass tends to under-report. Results are merged,
     dropping exact duplicates.
+
+    Notes-block calls run concurrently (up to `max_workers` at a time) since
+    each is independent -- set max_workers=1 to force one-at-a-time.
     """
     general_facts = extract_page_features(
         page_data, page_image_base64, page_number, page_class, subtype, client, model=model, verbose=verbose
@@ -492,12 +501,16 @@ def extract_page_features_thorough(
     blocks = find_note_blocks(page_data)
     _vprint(verbose, f"  [Notes] Detected {len(blocks)} heading/body block(s) for focused extraction")
 
-    notes_facts: list[ExtractedFact] = []
-    for block in blocks:
-        block_facts = extract_notes_block_facts(
+    def _extract_one(block: NoteBlock) -> list[ExtractedFact]:
+        return extract_notes_block_facts(
             block, page_data, page_number, page_class, subtype, client, model=model, verbose=verbose
         )
-        notes_facts.extend(block_facts)
+
+    notes_facts: list[ExtractedFact] = []
+    if blocks:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for block_facts in executor.map(_extract_one, blocks):
+                notes_facts.extend(block_facts)
 
     merged = _merge_facts(general_facts, notes_facts)
     _vprint(

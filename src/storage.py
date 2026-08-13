@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -194,6 +195,26 @@ def sync_output_dir(stem: str) -> None:
                 path.read_bytes(),
                 {"allowOverwrite": "true"},
             )
+
+
+def clear_outputs(stem: str) -> None:
+    """Delete every saved Stage A/B/C artifact for `stem` -- both the /tmp
+    working copy and the Blob-stored copies. Used when a PDF is re-uploaded
+    under a name that already has results (so the dashboard doesn't keep
+    showing a previous file's classification/facts/verdicts as if they
+    belonged to the new one) and by the manual "Clear results" button.
+    """
+    stem_dir = LOCAL_OUTPUT_DIR / stem
+    if stem_dir.exists():
+        shutil.rmtree(stem_dir)
+    if IS_VERCEL:
+        # _blob_list's prefix goes through requests' own (correct) query
+        # encoding -- do NOT _quote() it here, same reasoning as everywhere
+        # else in this module that lists/reads rather than writes.
+        prefix = f"{OUTPUT_PREFIX}{stem}/"
+        urls = [b["url"] for b in _blob_list(prefix)]
+        if urls:
+            vercel_blob.delete(urls)
 
 
 def read_json(stem: str, name: str) -> Any:

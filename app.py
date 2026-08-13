@@ -61,6 +61,9 @@ def upload():
     file = request.files.get("pdf_file")
     if file and file.filename.lower().endswith(".pdf"):
         storage.save_uploaded_pdf(file.filename, file)
+        # A re-upload under an existing filename must not leave the previous
+        # file's Stage A/B/C results looking like they belong to this one.
+        storage.clear_outputs(_stem(file.filename))
         return redirect(url_for("dashboard", filename=file.filename))
     return redirect(url_for("index"))
 
@@ -90,6 +93,13 @@ def dashboard(filename: str):
         verdicts=verdicts,
         verdict_counts=verdict_counts,
     )
+
+
+@app.route("/pdf/<filename>/clear", methods=["POST"])
+def clear_results(filename: str):
+    filename = _decode_filename(filename)
+    storage.clear_outputs(_stem(filename))
+    return redirect(url_for("dashboard", filename=filename))
 
 
 @app.route("/pdf/<filename>/run/a", methods=["POST"])

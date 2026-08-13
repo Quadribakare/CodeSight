@@ -17,6 +17,7 @@ per-document compliance report.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,12 @@ from src.openrouter_client import OpenRouterClient
 DEFAULT_MODEL = "google/gemini-3.1-flash-lite-20260507"
 
 VALID_VERDICTS = {"pass", "fail", "flag", "no_matching_clause"}
+
+# Judging is one small, independent API call per fact -- network-bound, not
+# CPU-bound -- so running several at once cuts wall-clock time roughly
+# max_workers-fold instead of paying every call's latency back to back.
+# Kept modest to stay well under OpenRouter's per-account rate limit.
+DEFAULT_MAX_WORKERS = 8
 
 
 @dataclass
@@ -152,12 +159,17 @@ def judge_features_for_pdf(
     regulations_path: str = "knowledge_base/regulations_combined.txt",
     limit: int | None = None,
     verbose: bool = False,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> list[Verdict]:
     """Run Stage C over every fact already saved in features.json for a PDF.
 
     Requires feature_agent.extract_features_for_pdf to have already been run
     (so features.json exists under output_dir/<pdf-stem>/). `limit` caps how
     many facts get judged, useful for testing before paying for a full run.
+
+    Facts are judged concurrently (up to `max_workers` at a time, default
+    DEFAULT_MAX_WORKERS) since each judgement is an independent API call --
+    set max_workers=1 to force the old one-at-a-time behaviour.
     """
     client = client or OpenRouterClient()
     pdf_out_dir = Path(output_dir) / Path(pdf_path).stem
@@ -174,15 +186,19 @@ def judge_features_for_pdf(
     chunks = load_regulation_chunks(regulations_path)
     _vprint(verbose, f"[Station 0] Loaded {len(facts)} fact(s) and {len(chunks)} regulation chunk(s)")
 
-    verdicts: list[Verdict] = []
-    for fact in facts:
+    def _judge_one(fact: dict[str, Any]) -> Verdict:
         candidates = find_candidate_clauses(fact, chunks)
         _vprint(
             verbose,
             f"  [Match] {fact['parameter_name']}={fact['value']} -> {len(candidates)} candidate(s)",
         )
-        verdict = judge_fact(fact, candidates, client, model=model, verbose=verbose)
-        verdicts.append(verdict)
+        return judge_fact(fact, candidates, client, model=model, verbose=verbose)
+
+    if facts:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            verdicts = list(executor.map(_judge_one, facts))
+    else:
+        verdicts = []
 
     verdicts_path = pdf_out_dir / "verdicts.json"
     verdicts_path.write_text(json.dumps([v.to_dict() for v in verdicts], indent=2))
