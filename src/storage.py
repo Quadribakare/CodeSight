@@ -27,7 +27,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 import requests
 
@@ -64,15 +64,20 @@ if IS_VERCEL:
 
 
 def _quote(name: str) -> str:
-    """Percent-encode one filename/stem before it goes into a blob pathname.
+    """Percent-encode one filename/stem for vercel_blob.put() only.
 
-    vercel_blob.put() builds its request URL by pasting the pathname straight
-    into an f-string instead of encoding it, so a real drawing filename with
-    spaces or parentheses (e.g. "25-112-A250(C01) Sections.pdf" -- typical of
-    CAD-exported sheets) can round-trip to a different string than what
-    list()'s properly-encoded query actually looks up, and the upload
-    silently becomes unfindable. Encoding it ourselves, consistently on every
-    write and read, sidesteps that regardless of the exact failure mode.
+    put() builds its request URL by pasting the pathname straight into an
+    f-string instead of encoding it, so a real drawing filename with spaces
+    or parentheses (e.g. "25-112-A250(C01) Sections.pdf" -- typical of
+    CAD-exported sheets) would otherwise go out as an invalid URL. Vercel's
+    server decodes the query param on arrival, so what actually gets stored
+    is the original literal string -- this is a write-time-only workaround.
+
+    Don't use this for list()'s `prefix` or for comparing against a
+    `pathname` a list() call already returned: those already go through
+    requests' own (correct, single-pass) query encoding, and the pathnames
+    list() gives back are the literal stored strings, not encoded ones.
+    Pre-encoding on that side double-encodes and breaks lookups instead.
     """
     return quote(name, safe="")
 
@@ -116,9 +121,9 @@ def list_pdfs() -> list[str]:
     names = {p.name for p in BUNDLED_DATA_DIR.glob("*.pdf")} if BUNDLED_DATA_DIR.exists() else set()
     if IS_VERCEL:
         for b in _blob_list(DATA_PREFIX):
-            encoded_name = b["pathname"][len(DATA_PREFIX):]
-            if encoded_name.lower().endswith(".pdf"):
-                names.add(unquote(encoded_name))
+            name = b["pathname"][len(DATA_PREFIX):]
+            if name.lower().endswith(".pdf"):
+                names.add(name)
     return sorted(names)
 
 
@@ -145,7 +150,7 @@ def ensure_local_pdf(filename: str) -> Path | None:
     if not IS_VERCEL:
         return None
 
-    pathname = DATA_PREFIX + _quote(filename)
+    pathname = DATA_PREFIX + filename
     matches = [b for b in _blob_list(pathname) if b["pathname"] == pathname]
     if not matches:
         return None
@@ -165,9 +170,9 @@ def prepare_output_root(stem: str) -> Path:
     stem_dir = LOCAL_OUTPUT_DIR / stem
     stem_dir.mkdir(parents=True, exist_ok=True)
     if IS_VERCEL:
-        prefix = f"{OUTPUT_PREFIX}{_quote(stem)}/"
+        prefix = f"{OUTPUT_PREFIX}{stem}/"
         for blob in _blob_list(prefix):
-            rel_name = unquote(blob["pathname"][len(prefix):])
+            rel_name = blob["pathname"][len(prefix):]
             dest = stem_dir / rel_name
             if not dest.exists():
                 _download_blob(blob["url"], dest)
@@ -205,8 +210,8 @@ def read_json(stem: str, name: str) -> Any:
 def stage_status(stem: str) -> dict:
     """Cheap has_a/has_b/has_c check -- lists filenames only, no downloads."""
     if IS_VERCEL:
-        prefix = f"{OUTPUT_PREFIX}{_quote(stem)}/"
-        names = {unquote(b["pathname"][len(prefix):]) for b in _blob_list(prefix)}
+        prefix = f"{OUTPUT_PREFIX}{stem}/"
+        names = {b["pathname"][len(prefix):] for b in _blob_list(prefix)}
     else:
         out_dir = LOCAL_OUTPUT_DIR / stem
         names = {p.name for p in out_dir.glob("*")} if out_dir.exists() else set()
