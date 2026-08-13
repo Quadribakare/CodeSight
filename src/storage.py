@@ -28,6 +28,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+import requests
+
 # Vercel only exposes the `VERCEL` system env var when "Enable access to
 # System Environment Variables" is turned on in project settings -- easy to
 # forget, and this app doesn't need anything else from that gated set. So
@@ -58,6 +60,19 @@ if IS_VERCEL:
             "it to this project, then redeploy."
         )
     import vercel_blob
+
+
+def _download_blob(url: str, dest_path: Path) -> None:
+    """Download a blob's content straight to `dest_path`.
+
+    Deliberately not using vercel_blob's own download_file(): it only
+    accepts paths relative to the current working directory and silently
+    mangles absolute paths (it does os.getcwd() + path.lstrip('/')), so
+    downloading into an absolute /tmp path fails an internal assertion.
+    """
+    resp = requests.get(f"{url}?download=1", timeout=30)
+    resp.raise_for_status()
+    dest_path.write_bytes(resp.content)
 
 
 def _blob_list(prefix: str) -> list[dict]:
@@ -121,7 +136,7 @@ def ensure_local_pdf(filename: str) -> Path | None:
     if not matches:
         return None
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    vercel_blob.download_file(matches[0]["url"], str(LOCAL_DATA_DIR) + "/")
+    _download_blob(matches[0]["url"], local_path)
     return local_path
 
 
@@ -139,8 +154,9 @@ def prepare_output_root(stem: str) -> Path:
         prefix = f"{OUTPUT_PREFIX}{stem}/"
         for blob in _blob_list(prefix):
             rel_name = blob["pathname"][len(prefix):]
-            if not (stem_dir / rel_name).exists():
-                vercel_blob.download_file(blob["url"], str(stem_dir) + "/")
+            dest = stem_dir / rel_name
+            if not dest.exists():
+                _download_blob(blob["url"], dest)
     return LOCAL_OUTPUT_DIR
 
 
