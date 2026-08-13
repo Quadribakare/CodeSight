@@ -27,6 +27,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, unquote
 
 import requests
 
@@ -60,6 +61,20 @@ if IS_VERCEL:
             "it to this project, then redeploy."
         )
     import vercel_blob
+
+
+def _quote(name: str) -> str:
+    """Percent-encode one filename/stem before it goes into a blob pathname.
+
+    vercel_blob.put() builds its request URL by pasting the pathname straight
+    into an f-string instead of encoding it, so a real drawing filename with
+    spaces or parentheses (e.g. "25-112-A250(C01) Sections.pdf" -- typical of
+    CAD-exported sheets) can round-trip to a different string than what
+    list()'s properly-encoded query actually looks up, and the upload
+    silently becomes unfindable. Encoding it ourselves, consistently on every
+    write and read, sidesteps that regardless of the exact failure mode.
+    """
+    return quote(name, safe="")
 
 
 def _download_blob(url: str, dest_path: Path) -> None:
@@ -100,11 +115,10 @@ def list_pdfs() -> list[str]:
     """Every PDF available to run the pipeline on: bundled samples plus uploads."""
     names = {p.name for p in BUNDLED_DATA_DIR.glob("*.pdf")} if BUNDLED_DATA_DIR.exists() else set()
     if IS_VERCEL:
-        names |= {
-            b["pathname"][len(DATA_PREFIX):]
-            for b in _blob_list(DATA_PREFIX)
-            if b["pathname"].lower().endswith(".pdf")
-        }
+        for b in _blob_list(DATA_PREFIX):
+            encoded_name = b["pathname"][len(DATA_PREFIX):]
+            if encoded_name.lower().endswith(".pdf"):
+                names.add(unquote(encoded_name))
     return sorted(names)
 
 
@@ -114,7 +128,7 @@ def save_uploaded_pdf(filename: str, file_storage) -> None:
         BUNDLED_DATA_DIR.mkdir(parents=True, exist_ok=True)
         file_storage.save(BUNDLED_DATA_DIR / filename)
         return
-    vercel_blob.put(DATA_PREFIX + filename, file_storage.read(), {"allowOverwrite": "true"})
+    vercel_blob.put(DATA_PREFIX + _quote(filename), file_storage.read(), {"allowOverwrite": "true"})
 
 
 def ensure_local_pdf(filename: str) -> Path | None:
@@ -131,7 +145,7 @@ def ensure_local_pdf(filename: str) -> Path | None:
     if not IS_VERCEL:
         return None
 
-    pathname = DATA_PREFIX + filename
+    pathname = DATA_PREFIX + _quote(filename)
     matches = [b for b in _blob_list(pathname) if b["pathname"] == pathname]
     if not matches:
         return None
@@ -151,9 +165,9 @@ def prepare_output_root(stem: str) -> Path:
     stem_dir = LOCAL_OUTPUT_DIR / stem
     stem_dir.mkdir(parents=True, exist_ok=True)
     if IS_VERCEL:
-        prefix = f"{OUTPUT_PREFIX}{stem}/"
+        prefix = f"{OUTPUT_PREFIX}{_quote(stem)}/"
         for blob in _blob_list(prefix):
-            rel_name = blob["pathname"][len(prefix):]
+            rel_name = unquote(blob["pathname"][len(prefix):])
             dest = stem_dir / rel_name
             if not dest.exists():
                 _download_blob(blob["url"], dest)
@@ -171,7 +185,9 @@ def sync_output_dir(stem: str) -> None:
     for path in stem_dir.iterdir():
         if path.is_file():
             vercel_blob.put(
-                f"{OUTPUT_PREFIX}{stem}/{path.name}", path.read_bytes(), {"allowOverwrite": "true"}
+                f"{OUTPUT_PREFIX}{_quote(stem)}/{_quote(path.name)}",
+                path.read_bytes(),
+                {"allowOverwrite": "true"},
             )
 
 
@@ -189,7 +205,8 @@ def read_json(stem: str, name: str) -> Any:
 def stage_status(stem: str) -> dict:
     """Cheap has_a/has_b/has_c check -- lists filenames only, no downloads."""
     if IS_VERCEL:
-        names = {b["pathname"].rsplit("/", 1)[-1] for b in _blob_list(f"{OUTPUT_PREFIX}{stem}/")}
+        prefix = f"{OUTPUT_PREFIX}{_quote(stem)}/"
+        names = {unquote(b["pathname"][len(prefix):]) for b in _blob_list(prefix)}
     else:
         out_dir = LOCAL_OUTPUT_DIR / stem
         names = {p.name for p in out_dir.glob("*")} if out_dir.exists() else set()
