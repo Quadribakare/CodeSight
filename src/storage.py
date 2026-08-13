@@ -28,7 +28,13 @@ import os
 from pathlib import Path
 from typing import Any
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
+# Vercel only exposes the `VERCEL` system env var when "Enable access to
+# System Environment Variables" is turned on in project settings -- easy to
+# forget, and this app doesn't need anything else from that gated set. So
+# detect Vercel by the one var this app actually depends on instead:
+# BLOB_READ_WRITE_TOKEN, added automatically the moment a Blob store is
+# connected, regardless of that toggle.
+IS_VERCEL = bool(os.environ.get("VERCEL")) or bool(os.environ.get("BLOB_READ_WRITE_TOKEN"))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
