@@ -77,6 +77,11 @@ def dashboard(filename: str):
     features = storage.read_json(stem, "features.json")
     verdicts = storage.read_json(stem, "verdicts.json")
 
+    if request.args.get("raw"):
+        # Temporary: expose the raw JSON (incl. reasoning, not shown in the
+        # dashboard table) to debug a classification result. Remove after.
+        return {"classification": classification, "features": features, "verdicts": verdicts}
+
     verdict_counts = {}
     if verdicts:
         for v in verdicts:
