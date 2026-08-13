@@ -33,9 +33,13 @@ from src.openrouter_client import OpenRouterClient
 
 DEFAULT_MODEL = "google/gemini-3.1-flash-lite-20260507"
 
-# Each notes block is an independent, text-only API call -- network-bound,
-# so a few can run at once instead of paying every call's latency serially.
-DEFAULT_MAX_WORKERS = 8
+# Reverted to sequential by default (was 8): controlled trials showed
+# parallel notes-block extraction returning fewer facts, inconsistently,
+# run to run (16/16/16 sequential vs 17/22/16 parallel on the same PDF) --
+# some responses come back degraded under concurrent load with this
+# model/provider. max_workers stays tunable for anyone who wants to
+# re-investigate, but 1 is the safe default.
+DEFAULT_MAX_WORKERS = 1
 
 VALID_FACT_TYPES = {"tagged_dimension", "note_derived"}
 
