@@ -74,6 +74,12 @@ def upload():
 
 @app.route("/pdf/<filename>")
 def dashboard(filename: str):
+    if request.args.get("debug"):
+        pdf_path = storage.ensure_local_pdf(filename)
+        return {
+            "filename_from_route_repr": repr(filename),
+            "ensure_local_pdf_result": str(pdf_path),
+        }
     if storage.ensure_local_pdf(filename) is None:
         return redirect(url_for("index"))
 
