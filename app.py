@@ -102,6 +102,13 @@ def clear_results(filename: str):
     return redirect(url_for("dashboard", filename=filename))
 
 
+@app.route("/pdf/<filename>/delete", methods=["POST"])
+def delete_pdf(filename: str):
+    filename = _decode_filename(filename)
+    storage.delete_pdf(filename)
+    return redirect(url_for("index"))
+
+
 @app.route("/pdf/<filename>/run/a", methods=["POST"])
 def run_stage_a(filename: str):
     filename = _decode_filename(filename)

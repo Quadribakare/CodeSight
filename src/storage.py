@@ -137,6 +137,24 @@ def save_uploaded_pdf(filename: str, file_storage) -> None:
     vercel_blob.put(DATA_PREFIX + _quote(filename), file_storage.read(), {"allowOverwrite": "true"})
 
 
+def delete_pdf(filename: str) -> None:
+    """Permanently remove `filename` itself plus all its saved Stage A/B/C
+    output -- both local disk (or the /tmp working copy on Vercel) and the
+    Blob-stored copies. Used by the "Delete" button on the drawings list.
+    """
+    clear_outputs(Path(filename).stem)
+
+    if not IS_VERCEL:
+        (BUNDLED_DATA_DIR / filename).unlink(missing_ok=True)
+        return
+
+    (LOCAL_DATA_DIR / filename).unlink(missing_ok=True)
+    pathname = DATA_PREFIX + filename
+    matches = [b for b in _blob_list(pathname) if b["pathname"] == pathname]
+    if matches:
+        vercel_blob.delete([b["url"] for b in matches])
+
+
 def ensure_local_pdf(filename: str) -> Path | None:
     """Return a real filesystem path to `filename` (for fitz to open), or None
     if it doesn't exist anywhere. Downloads from Blob storage into /tmp first

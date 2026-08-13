@@ -126,15 +126,29 @@ input[type="file"], input[type="number"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1rem 1.25rem;
-  text-decoration: none;
-  color: var(--text);
   transition: border-color 0.15s ease;
 }
 .pdf-card:hover { border-color: var(--purple); }
+
+.pdf-card-link {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
 
 .pdf-name { font-weight: 600; }
 

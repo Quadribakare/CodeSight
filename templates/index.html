@@ -10,14 +10,20 @@
 
 <div class="pdf-list">
   {% for pdf in pdfs %}
-  <a class="pdf-card" href="{{ url_for('dashboard', filename=pdf.filename) }}">
-    <div class="pdf-name">{{ pdf.filename }}</div>
-    <div class="stage-dots">
-      <span class="dot {{ 'dot-on' if pdf.has_a else '' }}" title="Stage A: Classification">A</span>
-      <span class="dot {{ 'dot-on' if pdf.has_b else '' }}" title="Stage B: Fact Extraction">B</span>
-      <span class="dot {{ 'dot-on' if pdf.has_c else '' }}" title="Stage C: Matching &amp; Judgement">C</span>
-    </div>
-  </a>
+  <div class="pdf-card">
+    <a class="pdf-card-link" href="{{ url_for('dashboard', filename=pdf.filename) }}">
+      <div class="pdf-name">{{ pdf.filename }}</div>
+      <div class="stage-dots">
+        <span class="dot {{ 'dot-on' if pdf.has_a else '' }}" title="Stage A: Classification">A</span>
+        <span class="dot {{ 'dot-on' if pdf.has_b else '' }}" title="Stage B: Fact Extraction">B</span>
+        <span class="dot {{ 'dot-on' if pdf.has_c else '' }}" title="Stage C: Matching &amp; Judgement">C</span>
+      </div>
+    </a>
+    <form action="{{ url_for('delete_pdf', filename=pdf.filename) }}" method="post"
+          onsubmit="return confirm('Delete {{ pdf.filename }} and all its results? This cannot be undone.');">
+      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+    </form>
+  </div>
   {% else %}
   <p class="empty">No PDFs yet — upload one above, or drop a file into the data/ folder.</p>
   {% endfor %}
