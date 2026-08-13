@@ -42,10 +42,15 @@ def debug_blobs():
     # Temporary: dump raw stored pathnames to debug a filename-encoding
     # mismatch. Remove before calling this done.
     prefix = request.args.get("prefix", "")
-    return {
+    filename = request.args.get("filename", "")
+    result = {
         "prefix_sent": prefix,
         "matches": [b["pathname"] for b in storage._blob_list(prefix)],
     }
+    if filename:
+        result["filename_repr"] = repr(filename)
+        result["ensure_local_pdf_result"] = str(storage.ensure_local_pdf(filename))
+    return result
 
 
 @app.route("/")
