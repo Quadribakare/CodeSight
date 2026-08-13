@@ -63,19 +63,6 @@ def debug_raw():
     return send_file(pdf_path, mimetype="application/pdf")
 
 
-@app.route("/debug/wipe", methods=["POST"])
-def debug_wipe():
-    # Temporary: wipe every blob in the store (all PDFs + all Stage A/B/C
-    # output), user-requested. Remove after.
-    import vercel_blob
-
-    all_blobs = storage._blob_list("")
-    urls = [b["url"] for b in all_blobs]
-    if urls:
-        vercel_blob.delete(urls)
-    return {"deleted": len(urls)}
-
-
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]
