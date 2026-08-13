@@ -41,7 +41,11 @@ def _pdf_status(filename: str) -> dict:
 def debug_blobs():
     # Temporary: dump raw stored pathnames to debug a filename-encoding
     # mismatch. Remove before calling this done.
-    return {"blobs": [b["pathname"] for b in storage._blob_list("")]}
+    prefix = request.args.get("prefix", "")
+    return {
+        "prefix_sent": prefix,
+        "matches": [b["pathname"] for b in storage._blob_list(prefix)],
+    }
 
 
 @app.route("/")
