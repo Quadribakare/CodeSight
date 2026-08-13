@@ -50,68 +50,6 @@ def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
 
 
-@app.route("/debug/inspect")
-def debug_inspect():
-    # Temporary: check actual stored file size + classification reasoning.
-    # Remove after.
-    filename = request.args.get("filename", "")
-    pathname = storage.DATA_PREFIX + filename
-    matches = [b for b in storage._blob_list(pathname) if b["pathname"] == pathname]
-    stem = _stem(filename)
-    storage.prepare_output_root(stem)
-    classification = storage.read_json(stem, "classification.json")
-    vector = storage.read_json(stem, "page_000_vector.json")
-    image_path = storage.LOCAL_OUTPUT_DIR / stem / "page_000.png"
-
-    # Fresh download + fresh fitz read, bypassing any stale saved output.
-    import fitz
-
-    from src.extraction.vector_reader import extract_pdf_vector_data
-
-    (storage.LOCAL_DATA_DIR / filename).unlink(missing_ok=True)
-    fresh_pdf_path = storage.ensure_local_pdf(filename)
-    fresh_downloaded_bytes = fresh_pdf_path.stat().st_size if fresh_pdf_path else None
-    fresh_header = fresh_pdf_path.read_bytes()[:8].hex() if fresh_pdf_path else None
-    fresh_page_count = None
-    fresh_span_count = None
-    fresh_error = None
-    try:
-        if fresh_pdf_path:
-            with fitz.open(str(fresh_pdf_path)) as doc:
-                fresh_page_count = doc.page_count
-            fresh_pages = extract_pdf_vector_data(str(fresh_pdf_path))
-            fresh_span_count = sum(len(p.text_spans) for p in fresh_pages)
-    except Exception as exc:
-        fresh_error = repr(exc)
-
-    return {
-        "blob_size_bytes": matches[0].get("size") if matches else None,
-        "blob_uploaded_at": matches[0].get("uploadedAt") if matches else None,
-        "classification": classification,
-        "fresh_downloaded_bytes": fresh_downloaded_bytes,
-        "fresh_header_hex": fresh_header,
-        "fresh_page_count": fresh_page_count,
-        "fresh_span_count": fresh_span_count,
-        "fresh_error": fresh_error,
-        "vector_text_span_count": len(vector.get("text_spans", [])) if vector else None,
-        "vector_first_5_spans": (vector.get("text_spans", [])[:5]) if vector else None,
-        "rendered_image_bytes": image_path.stat().st_size if image_path.exists() else None,
-    }
-
-
-@app.route("/debug/image")
-def debug_image():
-    filename = request.args.get("filename", "")
-    stem = _stem(filename)
-    storage.prepare_output_root(stem)
-    image_path = storage.LOCAL_OUTPUT_DIR / stem / "page_000.png"
-    if not image_path.exists():
-        return "no image", 404
-    from flask import send_file
-
-    return send_file(image_path, mimetype="image/png")
-
-
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]
