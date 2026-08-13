@@ -37,6 +37,13 @@ def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
 
 
+@app.route("/debug/blobs")
+def debug_blobs():
+    # Temporary: dump raw stored pathnames to debug a filename-encoding
+    # mismatch. Remove before calling this done.
+    return {"blobs": [b["pathname"] for b in storage._blob_list("")]}
+
+
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]
