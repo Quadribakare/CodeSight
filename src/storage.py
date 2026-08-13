@@ -114,7 +114,7 @@ def save_uploaded_pdf(filename: str, file_storage) -> None:
         BUNDLED_DATA_DIR.mkdir(parents=True, exist_ok=True)
         file_storage.save(BUNDLED_DATA_DIR / filename)
         return
-    vercel_blob.put(DATA_PREFIX + filename, file_storage.read())
+    vercel_blob.put(DATA_PREFIX + filename, file_storage.read(), {"allowOverwrite": "true"})
 
 
 def ensure_local_pdf(filename: str) -> Path | None:
@@ -170,7 +170,9 @@ def sync_output_dir(stem: str) -> None:
         return
     for path in stem_dir.iterdir():
         if path.is_file():
-            vercel_blob.put(f"{OUTPUT_PREFIX}{stem}/{path.name}", path.read_bytes())
+            vercel_blob.put(
+                f"{OUTPUT_PREFIX}{stem}/{path.name}", path.read_bytes(), {"allowOverwrite": "true"}
+            )
 
 
 def read_json(stem: str, name: str) -> Any:
