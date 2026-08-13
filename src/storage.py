@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -83,6 +84,9 @@ def _quote(name: str) -> str:
     return quote(name, safe="")
 
 
+_DOWNLOAD_RETRY_DELAYS_SEC = (0, 0.5, 1, 2, 3)  # ~6.5s total budget
+
+
 def _download_blob(url: str, dest_path: Path) -> None:
     """Download a blob's content straight to `dest_path`.
 
@@ -90,8 +94,20 @@ def _download_blob(url: str, dest_path: Path) -> None:
     accepts paths relative to the current working directory and silently
     mangles absolute paths (it does os.getcwd() + path.lstrip('/')), so
     downloading into an absolute /tmp path fails an internal assertion.
+
+    Retries a few times on 404: blob URLs sit behind a CDN, and deleting a
+    file then re-uploading to the same pathname within a second or two can
+    hit a brief window where the edge still serves a cached "not found" for
+    that URL before the new object has propagated -- confirmed by hitting
+    exactly this right after testing the delete button on a real file.
     """
-    resp = requests.get(f"{url}?download=1", timeout=30)
+    resp = None
+    for delay in _DOWNLOAD_RETRY_DELAYS_SEC:
+        if delay:
+            time.sleep(delay)
+        resp = requests.get(f"{url}?download=1", timeout=30)
+        if resp.status_code != 404:
+            break
     resp.raise_for_status()
     dest_path.write_bytes(resp.content)
 
