@@ -50,6 +50,23 @@ def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
 
 
+@app.route("/debug/inspect")
+def debug_inspect():
+    # Temporary: check actual stored file size + classification reasoning.
+    # Remove after.
+    filename = request.args.get("filename", "")
+    pathname = storage.DATA_PREFIX + filename
+    matches = [b for b in storage._blob_list(pathname) if b["pathname"] == pathname]
+    stem = _stem(filename)
+    storage.prepare_output_root(stem)
+    classification = storage.read_json(stem, "classification.json")
+    return {
+        "blob_size_bytes": matches[0].get("size") if matches else None,
+        "blob_uploaded_at": matches[0].get("uploadedAt") if matches else None,
+        "classification": classification,
+    }
+
+
 @app.route("/")
 def index():
     pdfs = [_pdf_status(f) for f in storage.list_pdfs()]
