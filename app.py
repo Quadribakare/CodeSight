@@ -17,6 +17,7 @@ as a Vercel Function -- see that module for why.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote
 
 from flask import Flask, redirect, render_template, request, url_for
 
@@ -29,32 +30,24 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB, large drawing sheets
 
 
+def _decode_filename(filename: str) -> str:
+    """Undo Vercel's Python runtime handing routes a still-percent-encoded
+    path segment instead of a decoded one (confirmed by direct inspection --
+    a URL ending in "...(C01)%20Sections.pdf" arrived at the view function
+    with the literal "%20" still in it, rather than a space). A normal WSGI
+    server decodes this before Flask ever sees it, so only redo it on Vercel
+    -- otherwise an already-decoded filename that happens to contain a literal
+    "%" would get mangled by decoding it a second time.
+    """
+    return unquote(filename) if storage.IS_VERCEL else filename
+
+
 def _stem(filename: str) -> str:
     return Path(filename).stem
 
 
 def _pdf_status(filename: str) -> dict:
     return {"filename": filename, **storage.stage_status(_stem(filename))}
-
-
-@app.route("/debug/blobs")
-def debug_blobs():
-    # Temporary: dump raw stored pathnames to debug a filename-encoding
-    # mismatch. Remove before calling this done.
-    filename = request.args.get("filename", "")
-    result = {}
-    if filename:
-        pathname = storage.DATA_PREFIX + filename
-        local_path = storage.LOCAL_DATA_DIR / filename
-        candidates = storage._blob_list(pathname)
-        result["filename_repr"] = repr(filename)
-        result["pathname_built_repr"] = repr(pathname)
-        result["local_path_existed_before_lookup"] = local_path.exists()
-        result["candidates_found"] = [
-            {"pathname_repr": repr(b["pathname"]), "equal_to_built": b["pathname"] == pathname}
-            for b in candidates
-        ]
-    return result
 
 
 @app.route("/")
@@ -74,12 +67,7 @@ def upload():
 
 @app.route("/pdf/<filename>")
 def dashboard(filename: str):
-    if request.args.get("debug"):
-        pdf_path = storage.ensure_local_pdf(filename)
-        return {
-            "filename_from_route_repr": repr(filename),
-            "ensure_local_pdf_result": str(pdf_path),
-        }
+    filename = _decode_filename(filename)
     if storage.ensure_local_pdf(filename) is None:
         return redirect(url_for("index"))
 
@@ -106,6 +94,7 @@ def dashboard(filename: str):
 
 @app.route("/pdf/<filename>/run/a", methods=["POST"])
 def run_stage_a(filename: str):
+    filename = _decode_filename(filename)
     pdf_path = storage.ensure_local_pdf(filename)
     if pdf_path is None:
         return redirect(url_for("index"))
@@ -118,6 +107,7 @@ def run_stage_a(filename: str):
 
 @app.route("/pdf/<filename>/run/b", methods=["POST"])
 def run_stage_b(filename: str):
+    filename = _decode_filename(filename)
     pdf_path = storage.ensure_local_pdf(filename)
     if pdf_path is None:
         return redirect(url_for("index"))
@@ -130,6 +120,7 @@ def run_stage_b(filename: str):
 
 @app.route("/pdf/<filename>/run/c", methods=["POST"])
 def run_stage_c(filename: str):
+    filename = _decode_filename(filename)
     limit_raw = request.form.get("limit", "").strip()
     limit = int(limit_raw) if limit_raw else None
     pdf_path = storage.ensure_local_pdf(filename)

@@ -10,3 +10,6 @@ venv/
 matrix*.png
 matrrix.png
 outreach/
+
+.vercel
+.env*
