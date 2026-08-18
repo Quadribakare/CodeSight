@@ -109,6 +109,26 @@ def delete_pdf(filename: str):
     return redirect(url_for("index"))
 
 
+@app.route("/pdf/<filename>/run/all", methods=["POST"])
+def run_all_stages(filename: str):
+    filename = _decode_filename(filename)
+    pdf_path = storage.ensure_local_pdf(filename)
+    if pdf_path is None:
+        return redirect(url_for("index"))
+    stem = _stem(filename)
+    out_root = storage.prepare_output_root(stem)
+    # Sync after each stage, not just at the end, so a failure or a timeout
+    # partway through (a large drawing's Stage C alone can take a while)
+    # doesn't throw away whatever earlier stages already finished.
+    classify_pdf(str(pdf_path), output_dir=str(out_root))
+    storage.sync_output_dir(stem)
+    extract_features_for_pdf(str(pdf_path), output_dir=str(out_root))
+    storage.sync_output_dir(stem)
+    judge_features_for_pdf(str(pdf_path), output_dir=str(out_root))
+    storage.sync_output_dir(stem)
+    return redirect(url_for("dashboard", filename=filename))
+
+
 @app.route("/pdf/<filename>/run/a", methods=["POST"])
 def run_stage_a(filename: str):
     filename = _decode_filename(filename)

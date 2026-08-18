@@ -4,12 +4,17 @@
 <a href="{{ url_for('index') }}" class="back-link">&larr; All drawings</a>
 <div class="dashboard-header">
   <h1>{{ filename }}</h1>
-  {% if classification or features or verdicts %}
-  <form action="{{ url_for('clear_results', filename=filename) }}" method="post"
-        onsubmit="return confirm('Clear all Stage A/B/C results for this PDF? This cannot be undone.');">
-    <button type="submit" class="btn btn-danger">Clear results</button>
-  </form>
-  {% endif %}
+  <div class="dashboard-actions">
+    <form action="{{ url_for('run_all_stages', filename=filename) }}" method="post">
+      <button type="submit" class="btn btn-primary" title="Runs Stage A, then B, then C in one go -- may take a while on a large drawing">Run All Stages</button>
+    </form>
+    {% if classification or features or verdicts %}
+    <form action="{{ url_for('clear_results', filename=filename) }}" method="post"
+          onsubmit="return confirm('Clear all Stage A/B/C results for this PDF? This cannot be undone.');">
+      <button type="submit" class="btn btn-danger">Clear results</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 
 <section class="stage-card">

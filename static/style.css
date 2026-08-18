@@ -117,6 +117,12 @@ input[type="file"], input[type="number"] {
 }
 .dashboard-header h1 { margin-bottom: 0; }
 
+.dashboard-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .pdf-list {
   display: grid;
   gap: 0.75rem;
