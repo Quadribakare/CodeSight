@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }} · Report{% endblock %}
+{% block content %}
+{% include "_drawing_header.html" %}
+
+{% macro clause(item) %}
+  {% if item.clause %}
+  <details class="clause">
+    <summary>Read the regulation text{% if item.source %} ({{ item.source }}){% endif %}</summary>
+    <blockquote>{{ item.clause }}</blockquote>
+  </details>
+  {% elif item.source %}
+  <p class="doc-source">Source: {{ item.source }}</p>
+  {% endif %}
+{% endmacro %}
+
+<div class="report-toolbar">
+  <form action="{{ url_for('run_report', filename=filename) }}" method="post" class="run-form">
+    <button type="submit" class="btn btn-primary" data-running="Checking against the regulations…" {{ "disabled" if not has_b }}>
+      {{ "Generate report again" if report.has_c or report.has_d else "Generate report" }}
+    </button>
+    {% include "_eyes.html" %}
+  </form>
+  {% if report.has_c or report.has_d %}
+  <a class="btn btn-ghost" href="{{ url_for('download_report', filename=filename) }}">Download PDF</a>
+  {% endif %}
+</div>
+
+{% if not has_b %}
+  <p class="empty">The report is written from the values read off the drawing, so
+    <a href="{{ url_for('dashboard', filename=filename) }}">run the analysis</a> first.</p>
+{% elif not (report.has_c or report.has_d) %}
+  <p class="empty">No report yet. Generating one checks every value against the regulations and looks
+    for anything the drawing should show but doesn't. It can take a few minutes on a large drawing.</p>
+{% else %}
+<article class="doc">
+  <header class="doc-head">
+    <p class="doc-kicker">Compliance pre-check report</p>
+    <h2 class="doc-title">{{ filename }}</h2>
+    <p class="doc-meta">Generated {{ today }}</p>
+    <p class="doc-disclaimer">This is an automatically generated pre-check from a research pipeline, not a
+      Building Control decision. Verify everything against the actual regulations before relying on it.</p>
+  </header>
+
+  <section class="doc-section">
+    <h3>In brief</h3>
+    <p>
+      {% if report.has_c %}
+        {{ report.n_checked }} values were read off the drawing and checked against the regulations.
+        {% if report.failures %}
+          {{ report.failures|length }} {{ "does" if report.failures|length == 1 else "do" }} not meet what the regulations require.
+        {% else %}
+          None of them break a clause the check could match.
+        {% endif %}
+      {% endif %}
+      {% if report.missing is not none %}
+        {% if report.missing %}
+          {{ report.missing|length }} thing{{ "" if report.missing|length == 1 else "s" }} the regulations expect on this kind of drawing {{ "is" if report.missing|length == 1 else "are" }} not shown.
+        {% else %}
+          Nothing the regulations expect on this kind of drawing appears to be missing.
+        {% endif %}
+      {% endif %}
+      {% if report.to_confirm %}
+        {{ report.to_confirm|length }} more point{{ "" if report.to_confirm|length == 1 else "s" }} need{{ "s" if report.to_confirm|length == 1 }} a person to confirm.
+      {% endif %}
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h3>1. Where the drawing does not meet the regulations</h3>
+    {% if not report.has_c %}
+      <p class="doc-note">The regulation check hasn't been run for this drawing.</p>
+    {% elif not report.failures %}
+      <p class="doc-note">No value on the drawing breaks a regulation clause the check could match.</p>
+    {% endif %}
+    <ol class="doc-list">
+      {% for item in report.failures %}
+      <li>
+        <h4>{{ item.title }}</h4>
+        <dl>
+          <dt>Drawing shows</dt><dd>{{ item.drawing_shows }}</dd>
+          <dt>What the regulations want</dt><dd>{{ item.requirement }}</dd>
+        </dl>
+        {{ clause(item) }}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="doc-section">
+    <h3>2. What the drawing is missing</h3>
+    {% if report.missing is none %}
+      <p class="doc-note">The missing-items check hasn't been run for this drawing.</p>
+    {% elif not report.missing %}
+      <p class="doc-note">Nothing the regulations expect on this kind of drawing appears to be missing.</p>
+    {% endif %}
+    <ol class="doc-list">
+      {% for item in report.missing or [] %}
+      <li>
+        <h4>{{ item.title }}</h4>
+        <dl>
+          {% if item.area %}<dt>Drawing area</dt><dd>{{ item.area }}</dd>{% endif %}
+          <dt>What the regulations want</dt><dd>{{ item.requirement }}</dd>
+          <dt>How sure</dt><dd>{{ item.certainty }}</dd>
+        </dl>
+        {{ clause(item) }}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {% if report.to_confirm %}
+  <section class="doc-section">
+    <h3>3. Points to confirm</h3>
+    <p class="doc-note">A regulation touches on these, but it doesn't settle whether the drawing is right.</p>
+    <ol class="doc-list">
+      {% for item in report.to_confirm %}
+      <li>
+        <h4>{{ item.title }}</h4>
+        <dl>
+          <dt>Drawing shows</dt><dd>{{ item.drawing_shows }}</dd>
+          <dt>Why it needs checking</dt><dd>{{ item.requirement }}</dd>
+        </dl>
+        {{ clause(item) }}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
+  {% if report.has_c %}
+  <footer class="doc-foot">
+    Of the {{ report.n_checked }} values read from the drawing, {{ report.n_passed }} met the clause they were
+    checked against and {{ report.n_no_clause }} had no clause that applies to them.
+  </footer>
+  {% endif %}
+</article>
+{% endif %}
+
+<script src="{{ url_for('static', filename='run.js') }}"></script>
+{% endblock %}

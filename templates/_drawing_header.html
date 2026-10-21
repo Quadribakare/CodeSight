@@ -1,0 +1,26 @@
+<a href="{{ url_for('index') }}" class="back-link">&larr; All drawings</a>
+<div class="dashboard-header">
+  <h1>{{ filename }}</h1>
+  <div class="dashboard-actions">
+    <form action="{{ url_for('run_all_stages', filename=filename) }}" method="post" class="run-form">
+      <button type="submit" class="btn btn-primary" data-running="Running everything…"
+              title="Runs the analysis, then writes the report -- may take a while on a large drawing">Run everything</button>
+      {% include "_eyes.html" %}
+    </form>
+    {% if has_a or has_b or has_c or has_d %}
+    <form action="{{ url_for('clear_results', filename=filename) }}" method="post"
+          onsubmit="return confirm('Clear the analysis and the report for this PDF? This cannot be undone.');">
+      <button type="submit" class="btn btn-danger">Clear results</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<nav class="tab-nav">
+  <a class="tab-btn {{ 'tab-btn-active' if active_page == 'analysis' }}" href="{{ url_for('dashboard', filename=filename) }}">
+    Analysis <span class="tab-dot {{ 'tab-dot-on' if has_a and has_b }}"></span>
+  </a>
+  <a class="tab-btn {{ 'tab-btn-active' if active_page == 'report' }}" href="{{ url_for('report_page', filename=filename) }}">
+    Report <span class="tab-dot {{ 'tab-dot-on' if has_c and has_d }}"></span>
+  </a>
+</nav>

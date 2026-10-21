@@ -14,10 +14,8 @@
     <a class="pdf-card-link" href="{{ url_for('dashboard', filename=pdf.filename) }}">
       <div class="pdf-name">{{ pdf.filename }}</div>
       <div class="stage-dots">
-        <span class="dot {{ 'dot-on' if pdf.has_a else '' }}" title="Stage A: Classification">A</span>
-        <span class="dot {{ 'dot-on' if pdf.has_b else '' }}" title="Stage B: Fact Extraction">B</span>
-        <span class="dot {{ 'dot-on' if pdf.has_c else '' }}" title="Stage C: Matching &amp; Judgement">C</span>
-        <span class="dot {{ 'dot-on' if pdf.has_d else '' }}" title="Stage D: Missing Items Check">D</span>
+        <span class="pill {{ 'pill-on' if pdf.has_a and pdf.has_b }}" title="Stages A + B: classification and fact extraction">Analysis</span>
+        <span class="pill {{ 'pill-on' if pdf.has_c and pdf.has_d }}" title="Stages C + D: regulation check and missing items">Report</span>
       </div>
     </a>
     <form action="{{ url_for('delete_pdf', filename=pdf.filename) }}" method="post"
