@@ -32,6 +32,7 @@ from typing import Any
 from urllib.parse import quote
 
 import requests
+import vercel_blob  # unconditional on purpose -- see IS_VERCEL check below
 
 # Vercel only exposes the `VERCEL` system env var when "Enable access to
 # System Environment Variables" is turned on in project settings -- easy to
@@ -55,14 +56,12 @@ LOCAL_OUTPUT_DIR = Path("/tmp/outputs") if IS_VERCEL else BASE_DIR / "outputs"
 DATA_PREFIX = "data/"
 OUTPUT_PREFIX = "outputs/"
 
-if IS_VERCEL:
-    if not os.environ.get("BLOB_READ_WRITE_TOKEN"):
-        raise RuntimeError(
-            "Running on Vercel but BLOB_READ_WRITE_TOKEN is not set -- create a "
-            "Blob store (Project > Storage > Create Database > Blob) and connect "
-            "it to this project, then redeploy."
-        )
-    import vercel_blob
+if IS_VERCEL and not os.environ.get("BLOB_READ_WRITE_TOKEN"):
+    raise RuntimeError(
+        "Running on Vercel but BLOB_READ_WRITE_TOKEN is not set -- create a "
+        "Blob store (Project > Storage > Create Database > Blob) and connect "
+        "it to this project, then redeploy."
+    )
 
 
 def _quote(name: str) -> str:

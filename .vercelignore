@@ -1,0 +1,12 @@
+# Personal/dissertation files and scratch data that live in this folder but
+# are not part of the deployed app -- these aren't excluded by .gitignore
+# (they're untracked, not ignored), so a `vercel deploy` from the local
+# working directory was bundling them into the function and blowing past
+# the 225 MB serverless function size limit.
+*.docx
+*.pptx
+*.webp
+*.zip
+msc_data_extracted/
+rejection_letters/
+outreach/
