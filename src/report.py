@@ -7,26 +7,20 @@ that's the format a reviewer already knows how to read -- but with no real
 council name, logo, or branding anywhere, and an explicit disclaimer at both
 the top and bottom. This is a pre-check report from this pipeline, not a
 building-control decision, and must never be mistaken for one.
+
+Uses fpdf2 rather than reportlab: it's pure-Python with no compiled/binary
+dependencies, which matters on Vercel's serverless Python runtime where the
+deployed function has a hard size limit (reportlab + the Pillow it pulls in
+pushed the bundle over that limit and broke the whole app -- see the commit
+that replaced it).
 """
 
 from __future__ import annotations
 
-import io
 from datetime import date
 from typing import Any
 
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import cm
-from reportlab.platypus import (
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+from fpdf import FPDF
 
 DISCLAIMER = (
     "This is an automatically generated pre-check from a research pipeline. "
@@ -41,53 +35,59 @@ _CONFIDENCE_LABELS = {
     "possibly_missing": "Possibly missing",
 }
 
+# fpdf2's built-in core fonts (no bundled Unicode font, to keep this
+# dependency-free and small) only support latin-1. Clause text pulled from
+# real scanned regulation PDFs routinely has smart quotes/en-dashes/etc
+# outside that range, so anything going on the page gets normalized first
+# instead of letting FPDFUnicodeEncodingException take the whole request down.
+_CHAR_REPLACEMENTS = {
+    "‘": "'", "’": "'", "“": '"', "”": '"',
+    "–": "-", "—": "--", "…": "...", " ": " ",
+}
 
-def _styles() -> dict[str, ParagraphStyle]:
-    base = getSampleStyleSheet()
-    return {
-        "title": ParagraphStyle(
-            "ReportTitle", parent=base["Title"], alignment=TA_CENTER, fontSize=16,
-        ),
-        "disclaimer": ParagraphStyle(
-            "Disclaimer",
-            parent=base["Normal"],
-            fontSize=8.5,
-            textColor=colors.HexColor("#7a1f1f"),
-            backColor=colors.HexColor("#fdecec"),
-            borderColor=colors.HexColor("#e5a0a0"),
-            borderWidth=0.75,
-            borderPadding=6,
-            leading=11,
-        ),
-        "body": base["Normal"],
-        "cell": ParagraphStyle("Cell", parent=base["Normal"], fontSize=8.5, leading=11),
-        "footer": ParagraphStyle(
-            "Footer", parent=base["Normal"], fontSize=7.5, textColor=colors.grey,
-        ),
-    }
+
+def _sanitize(text: str) -> str:
+    for src, dest in _CHAR_REPLACEMENTS.items():
+        text = text.replace(src, dest)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
+_MAX_CLAUSE_CHARS = 450
+
+
+def _truncate_clause(text: str) -> str:
+    if len(text) <= _MAX_CLAUSE_CHARS:
+        return text
+    return text[:_MAX_CLAUSE_CHARS].rsplit(" ", 1)[0] + "..."
+
+
+def _disclaimer_box(pdf: FPDF, text: str, *, text_color: tuple[int, int, int]) -> None:
+    pdf.set_x(pdf.l_margin)
+    pdf.set_fill_color(253, 236, 236)
+    pdf.set_draw_color(229, 160, 160)
+    pdf.set_text_color(*text_color)
+    pdf.set_font("Helvetica", size=8.5)
+    pdf.multi_cell(0, 4.5, text, border=1, fill=True)
+    pdf.set_text_color(0, 0, 0)
 
 
 def build_missing_items_pdf(filename: str, missing_items: list[dict[str, Any]]) -> bytes:
     """Build the Stage D report PDF and return its raw bytes."""
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=1.8 * cm,
-        bottomMargin=1.8 * cm,
-    )
-    styles = _styles()
-    story: list[Any] = []
+    pdf = FPDF(format="A4")
+    pdf.set_margin(20)
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
 
-    story.append(Paragraph("Compliance Pre-Check — Possible Missing Items", styles["title"]))
-    story.append(Spacer(1, 6))
-    story.append(Paragraph(DISCLAIMER, styles["disclaimer"]))
-    story.append(Spacer(1, 14))
+    pdf.set_font("Helvetica", style="B", size=16)
+    pdf.cell(0, 10, "Compliance Pre-Check -- Possible Missing Items", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
 
-    story.append(Paragraph(f"<b>Drawing:</b> {filename}", styles["body"]))
-    story.append(Paragraph(f"<b>Generated:</b> {date.today().isoformat()}", styles["body"]))
+    _disclaimer_box(pdf, DISCLAIMER, text_color=(122, 31, 31))
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", size=10)
+    pdf.cell(0, 6, f"Drawing: {_sanitize(filename)}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"Generated: {date.today().isoformat()}", new_x="LMARGIN", new_y="NEXT")
 
     reportable = [m for m in missing_items if m.get("confidence") in _CONFIDENCE_LABELS]
     by_group: dict[tuple[str, str], int] = {}
@@ -98,52 +98,38 @@ def build_missing_items_pdf(filename: str, missing_items: list[dict[str, Any]]) 
         summary = "; ".join(f"{cls}/{sub}: {n} item(s)" for (cls, sub), n in by_group.items())
     else:
         summary = "No likely-missing items found."
-    story.append(Paragraph(f"<b>Summary:</b> {summary}", styles["body"]))
-    story.append(Spacer(1, 14))
+    pdf.multi_cell(0, 6, _sanitize(f"Summary: {summary}"))
+    pdf.ln(4)
 
     if reportable:
-        header = ["Drawing area", "Requirement", "Confidence", "Cited clause excerpt"]
-        rows = [[Paragraph(f"<b>{h}</b>", styles["cell"]) for h in header]]
-        for m in reportable:
-            area = f"{m.get('page_class', '')}/{m.get('page_subtype', '')}"
-            requirement = m.get("requirement", "")
-            confidence = _CONFIDENCE_LABELS.get(m.get("confidence", ""), m.get("confidence", ""))
-            clause = m.get("cited_clause_text") or "—"
-            doc_name = m.get("cited_source_document")
-            clause_cell = f"{clause}" + (f"<br/><i>({doc_name})</i>" if doc_name else "")
-            rows.append(
-                [
-                    Paragraph(area, styles["cell"]),
-                    Paragraph(requirement, styles["cell"]),
-                    Paragraph(confidence, styles["cell"]),
-                    Paragraph(clause_cell, styles["cell"]),
-                ]
-            )
-
-        table = Table(rows, colWidths=[3.2 * cm, 3.6 * cm, 2.6 * cm, 7.6 * cm], repeatRows=1)
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e1a2b")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f5fa")]),
-                ]
-            )
-        )
-        story.append(table)
+        with pdf.table(
+            col_widths=(28, 32, 24, 66),
+            text_align="LEFT",
+            line_height=4.5,
+        ) as table:
+            header = table.row()
+            for h in ["Drawing area", "Requirement", "Confidence", "Cited clause excerpt"]:
+                header.cell(h)
+            for m in reportable:
+                area = f"{m.get('page_class', '')}/{m.get('page_subtype', '')}"
+                requirement = m.get("requirement", "")
+                confidence = _CONFIDENCE_LABELS.get(m.get("confidence", ""), m.get("confidence", ""))
+                clause = _truncate_clause(m.get("cited_clause_text") or "--")
+                doc_name = m.get("cited_source_document")
+                clause_cell = clause + (f" ({doc_name})" if doc_name else "")
+                row = table.row()
+                row.cell(_sanitize(area))
+                row.cell(_sanitize(requirement))
+                row.cell(_sanitize(confidence))
+                row.cell(_sanitize(clause_cell))
     else:
-        story.append(Paragraph("No likely-missing items were identified by this pre-check.", styles["body"]))
+        pdf.multi_cell(0, 6, "No likely-missing items were identified by this pre-check.")
 
-    story.append(Spacer(1, 18))
-    story.append(Paragraph(DISCLAIMER, styles["footer"]))
-    story.append(
-        Paragraph(
-            "Not affiliated with, and not issued by, any Building Control authority.",
-            styles["footer"],
-        )
-    )
+    pdf.ln(6)
+    _disclaimer_box(pdf, DISCLAIMER, text_color=(120, 120, 120))
+    pdf.set_x(pdf.l_margin)
+    pdf.set_font("Helvetica", size=7.5)
+    pdf.set_text_color(120, 120, 120)
+    pdf.multi_cell(0, 4, "Not affiliated with, and not issued by, any Building Control authority.")
 
-    doc.build(story)
-    return buf.getvalue()
+    return bytes(pdf.output())
