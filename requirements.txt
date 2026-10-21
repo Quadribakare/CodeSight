@@ -5,6 +5,9 @@ PyMuPDF>=1.24.0,<2.0
 openai>=1.30.0
 python-dotenv>=1.0.0
 Flask>=3.0.0
-vercel_blob>=0.2.3
+# Capped below 0.5.0 on purpose: that release restructured the whole SDK
+# (import vercel_blob; vercel_blob.put(...) -> from vercel import blob;
+# blob.put_blob(...)) -- a breaking change this code isn't written against.
+vercel_blob>=0.2.3,<0.5.0
 requests>=2.31.0
 fpdf2>=2.7.0
