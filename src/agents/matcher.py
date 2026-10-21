@@ -74,18 +74,19 @@ def _fact_terms(fact: dict[str, Any]) -> set[str]:
     return words - _STOPWORDS
 
 
-def find_candidate_clauses(
-    fact: dict[str, Any],
+def find_candidate_clauses_for_terms(
+    terms: set[str],
     chunks: list[RegulationChunk],
     top_k: int = 5,
 ) -> list[RegulationChunk]:
-    """Rank regulation chunks by keyword overlap with a fact, returning the top_k best matches.
+    """Rank regulation chunks by keyword overlap with an arbitrary term set.
 
-    Returns an empty list if nothing scores above zero overlap -- that's a
-    valid, honest result (judge.py should report "no_matching_clause" rather
-    than being handed an irrelevant chunk to force a verdict from).
+    Shared primitive behind find_candidate_clauses (per-fact queries, Stage C)
+    and absence_agent's per-drawing-type queries (Stage D). Returns an empty
+    list if nothing scores above zero overlap -- that's a valid, honest
+    result, not an error: the caller should report "no match" rather than
+    being handed an irrelevant chunk to force a verdict from.
     """
-    terms = _fact_terms(fact)
     if not terms:
         return []
 
@@ -98,6 +99,15 @@ def find_candidate_clauses(
 
     scored.sort(key=lambda pair: -pair[0])
     return [chunk for _, chunk in scored[:top_k]]
+
+
+def find_candidate_clauses(
+    fact: dict[str, Any],
+    chunks: list[RegulationChunk],
+    top_k: int = 5,
+) -> list[RegulationChunk]:
+    """Rank regulation chunks by keyword overlap with a fact, returning the top_k best matches."""
+    return find_candidate_clauses_for_terms(_fact_terms(fact), chunks, top_k)
 
 
 if __name__ == "__main__":

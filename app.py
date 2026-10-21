@@ -19,12 +19,14 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import unquote
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, Response, redirect, render_template, request, url_for
 
 from src import storage
+from src.agents.absence_agent import detect_missing_items_for_pdf
 from src.agents.classifier_agent import classify_pdf
 from src.agents.feature_agent import extract_features_for_pdf
 from src.agents.judge import judge_features_for_pdf
+from src.report import build_missing_items_pdf
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB, large drawing sheets
@@ -79,6 +81,7 @@ def dashboard(filename: str):
     classification = storage.read_json(stem, "classification.json")
     features = storage.read_json(stem, "features.json")
     verdicts = storage.read_json(stem, "verdicts.json")
+    missing_items = storage.read_json(stem, "missing_items.json")
 
     verdict_counts = {}
     if verdicts:
@@ -92,6 +95,7 @@ def dashboard(filename: str):
         features=features,
         verdicts=verdicts,
         verdict_counts=verdict_counts,
+        missing_items=missing_items,
     )
 
 
@@ -168,6 +172,35 @@ def run_stage_c(filename: str):
     judge_features_for_pdf(str(pdf_path), output_dir=str(out_root), limit=limit)
     storage.sync_output_dir(stem)
     return redirect(url_for("dashboard", filename=filename))
+
+
+@app.route("/pdf/<filename>/run/d", methods=["POST"])
+def run_stage_d(filename: str):
+    filename = _decode_filename(filename)
+    pdf_path = storage.ensure_local_pdf(filename)
+    if pdf_path is None:
+        return redirect(url_for("index"))
+    stem = _stem(filename)
+    out_root = storage.prepare_output_root(stem)
+    detect_missing_items_for_pdf(str(pdf_path), output_dir=str(out_root))
+    storage.sync_output_dir(stem)
+    return redirect(url_for("dashboard", filename=filename))
+
+
+@app.route("/pdf/<filename>/report.pdf")
+def download_report(filename: str):
+    filename = _decode_filename(filename)
+    stem = _stem(filename)
+    storage.prepare_output_root(stem)
+    missing_items = storage.read_json(stem, "missing_items.json")
+    if missing_items is None:
+        return redirect(url_for("dashboard", filename=filename))
+    pdf_bytes = build_missing_items_pdf(filename, missing_items)
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{stem}-missing-items.pdf"'},
+    )
 
 
 if __name__ == "__main__":

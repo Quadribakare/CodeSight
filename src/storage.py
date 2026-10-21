@@ -271,7 +271,7 @@ def read_json(stem: str, name: str) -> Any:
 
 
 def stage_status(stem: str) -> dict:
-    """Cheap has_a/has_b/has_c check -- lists filenames only, no downloads."""
+    """Cheap has_a/has_b/has_c/has_d check -- lists filenames only, no downloads."""
     if IS_VERCEL:
         prefix = f"{OUTPUT_PREFIX}{stem}/"
         names = {b["pathname"][len(prefix):] for b in _blob_list(prefix)}
@@ -282,4 +282,5 @@ def stage_status(stem: str) -> dict:
         "has_a": "classification.json" in names,
         "has_b": "features.json" in names,
         "has_c": "verdicts.json" in names,
+        "has_d": "missing_items.json" in names,
     }

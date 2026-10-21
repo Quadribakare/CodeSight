@@ -17,6 +17,14 @@
   </div>
 </div>
 
+<div class="tab-nav" role="tablist">
+  <button type="button" class="tab-btn" data-tab="a" role="tab">Stage A <span class="tab-dot {{ 'tab-dot-on' if classification else '' }}"></span></button>
+  <button type="button" class="tab-btn" data-tab="b" role="tab">Stage B <span class="tab-dot {{ 'tab-dot-on' if features else '' }}"></span></button>
+  <button type="button" class="tab-btn" data-tab="c" role="tab">Stage C <span class="tab-dot {{ 'tab-dot-on' if verdicts else '' }}"></span></button>
+  <button type="button" class="tab-btn" data-tab="d" role="tab">Stage D <span class="tab-dot {{ 'tab-dot-on' if missing_items is not none else '' }}"></span></button>
+</div>
+
+<div class="tab-panel" data-tab="a">
 <section class="stage-card">
   <div class="stage-header">
     <h2>Stage A — Classification</h2>
@@ -50,7 +58,9 @@
     <p class="empty">Not run yet.</p>
   {% endif %}
 </section>
+</div>
 
+<div class="tab-panel" data-tab="b">
 <section class="stage-card">
   <div class="stage-header">
     <h2>Stage B — Fact Extraction</h2>
@@ -83,7 +93,9 @@
     <p class="empty">Not run yet.</p>
   {% endif %}
 </section>
+</div>
 
+<div class="tab-panel" data-tab="c">
 <section class="stage-card">
   <div class="stage-header">
     <h2>Stage C — Matching &amp; Judgement</h2>
@@ -123,8 +135,51 @@
     <p class="empty">Not run yet.</p>
   {% endif %}
 </section>
+</div>
+
+<div class="tab-panel" data-tab="d">
+<section class="stage-card">
+  <div class="stage-header">
+    <h2>Stage D — Missing Items Check</h2>
+    <form action="{{ url_for('run_stage_d', filename=filename) }}" method="post"
+          onsubmit="this.querySelector('button').disabled = true; this.querySelector('.eyes').classList.add('blinking'); return true;">
+      <button type="submit" class="btn btn-primary" {{ "disabled" if not features }}>Run Stage D</button>
+      <span class="eyes" aria-hidden="true"><span class="eye"></span><span class="eye"></span></span>
+    </form>
+  </div>
+
+  {% if missing_items %}
+    <p class="stage-summary">{{ missing_items|length }} possible missing item(s) found.</p>
+    <div class="scroll-table">
+      <table class="result-table">
+        <thead>
+          <tr><th>Drawing area</th><th>Requirement</th><th>Confidence</th><th>Cited clause</th></tr>
+        </thead>
+        <tbody>
+          {% for m in missing_items %}
+          <tr>
+            <td>{{ m.page_class }}/{{ m.page_subtype }}</td>
+            <td>{{ m.requirement }}</td>
+            <td><span class="badge badge-{{ 'fail' if m.confidence == 'likely_missing' else 'flag' }}">{{ m.confidence.replace('_', ' ') }}</span></td>
+            <td class="quote-cell">{{ m.cited_clause_text or "—" }}{% if m.cited_source_document %} <em>({{ m.cited_source_document }})</em>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="stage-summary">
+      <a class="back-link" href="{{ url_for('download_report', filename=filename) }}">Download report (PDF)</a>
+    </p>
+  {% elif missing_items is not none %}
+    <p class="empty">No likely-missing items found.</p>
+  {% else %}
+    <p class="empty">Not run yet.</p>
+  {% endif %}
+</section>
+</div>
 
 {% if verdicts %}
 <script src="{{ url_for('static', filename='verdict-filter.js') }}"></script>
 {% endif %}
+<script src="{{ url_for('static', filename='tabs.js') }}"></script>
 {% endblock %}
