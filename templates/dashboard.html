@@ -17,7 +17,7 @@
     </form>
   </div>
 
-  <h3>Sheet classification</h3>
+  <h3>Stage A &mdash; Sheet classification</h3>
   {% if classification %}
     <table class="result-table">
       <thead>
@@ -43,7 +43,7 @@
     <p class="empty">Not run yet.</p>
   {% endif %}
 
-  <h3>Values read from the drawing</h3>
+  <h3>Stage B &mdash; Values read from the drawing</h3>
   {% if features %}
     <p class="stage-summary">{{ features|length }} value(s) extracted.</p>
     <div class="scroll-table">

@@ -218,7 +218,7 @@ def build_report_pdf(filename: str, report: dict[str, Any]) -> bytes:
 
     failures, missing, to_confirm = report["failures"], report["missing"], report["to_confirm"]
 
-    _section_heading(pdf, "1. Where the drawing does not meet the regulations")
+    _section_heading(pdf, "Stage C -- Where the drawing does not meet the regulations")
     if not report["has_c"]:
         _labelled(pdf, "Not checked", "the regulation check has not been run for this drawing.")
     elif not failures:
@@ -230,7 +230,7 @@ def build_report_pdf(filename: str, report: dict[str, Any]) -> bytes:
             ("Source", item.get("source") or ""),
         ])
 
-    _section_heading(pdf, "2. What the drawing is missing")
+    _section_heading(pdf, "Stage D -- What the drawing is missing")
     if missing is None:
         _labelled(pdf, "Not checked", "the missing-items check has not been run for this drawing.")
     elif not missing:
@@ -244,7 +244,7 @@ def build_report_pdf(filename: str, report: dict[str, Any]) -> bytes:
         ])
 
     if to_confirm:
-        _section_heading(pdf, "3. Points to confirm")
+        _section_heading(pdf, "Points to confirm")
         for i, item in enumerate(to_confirm, 1):
             _entry(pdf, i, item, [
                 ("Drawing shows", item["drawing_shows"]),

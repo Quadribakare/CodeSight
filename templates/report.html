@@ -67,7 +67,7 @@
   </section>
 
   <section class="doc-section">
-    <h3>1. Where the drawing does not meet the regulations</h3>
+    <h3>Stage C &mdash; Where the drawing does not meet the regulations</h3>
     {% if not report.has_c %}
       <p class="doc-note">The regulation check hasn't been run for this drawing.</p>
     {% elif not report.failures %}
@@ -88,7 +88,7 @@
   </section>
 
   <section class="doc-section">
-    <h3>2. What the drawing is missing</h3>
+    <h3>Stage D &mdash; What the drawing is missing</h3>
     {% if report.missing is none %}
       <p class="doc-note">The missing-items check hasn't been run for this drawing.</p>
     {% elif not report.missing %}
@@ -111,7 +111,7 @@
 
   {% if report.to_confirm %}
   <section class="doc-section">
-    <h3>3. Points to confirm</h3>
+    <h3>Points to confirm</h3>
     <p class="doc-note">A regulation touches on these, but it doesn't settle whether the drawing is right.</p>
     <ol class="doc-list">
       {% for item in report.to_confirm %}
