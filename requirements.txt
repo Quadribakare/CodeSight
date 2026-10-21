@@ -1,4 +1,7 @@
-PyMuPDF>=1.24.0
+# Capped below 2.0 on purpose: PyMuPDF 2.0 pulls in onnxruntime, numpy,
+# pymupdf-layout, pymupdf4llm, protobuf, networkx (150+ MB of ML deps this
+# app never uses) and blew the Vercel function bundle past its size limit.
+PyMuPDF>=1.24.0,<2.0
 openai>=1.30.0
 python-dotenv>=1.0.0
 Flask>=3.0.0
